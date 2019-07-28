@@ -32,7 +32,7 @@ import (
 	"strings"
 	"unicode"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/astaxie/beego/swagger"
 	"github.com/astaxie/beego/utils"
@@ -119,12 +119,12 @@ func ParsePackagesFromDir(dirpath string) {
 			// all 'tests' folders and dot folders wihin dirpath
 			d, _ := filepath.Rel(dirpath, fpath)
 			if !(d == "vendor" || strings.HasPrefix(d, "vendor"+string(os.PathSeparator))) &&
-				!strings.Contains(fpath, "tests") &&
+				!strings.Contains(d, "tests") &&
 				!(d[0] == '.') {
 				err = parsePackageFromDir(fpath)
 				if err != nil {
 					// Send the error to through the channel and continue walking
-					c <- fmt.Errorf("Error while parsing directory: %s", err.Error())
+					c <- fmt.Errorf("error while parsing directory: %s", err.Error())
 					return nil
 				}
 			}
@@ -541,7 +541,7 @@ func parserComments(f *ast.FuncDecl, controllerName, pkgpath string) error {
 	//TODO: resultMap := buildParamMap(f.Type.Results)
 	if comments != nil && comments.List != nil {
 		for _, c := range comments.List {
-			t := strings.TrimSpace(strings.TrimLeft(c.Text, "//"))
+			t := strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
 			if strings.HasPrefix(t, "@router") {
 				elements := strings.TrimSpace(t[len("@router"):])
 				e1 := strings.SplitN(elements, " ", 2)
@@ -791,10 +791,21 @@ func setParamType(para *swagger.Parameter, typ string, pkgpath, controllerName s
 	if typ == "string" || typ == "number" || typ == "integer" || typ == "boolean" ||
 		typ == astTypeArray || typ == "file" {
 		paraType = typ
+		if para.In == "body" {
+			para.Schema = &swagger.Schema{
+				Type: paraType,
+			}
+		}
 	} else if sType, ok := basicTypes[typ]; ok {
 		typeFormat := strings.Split(sType, ":")
 		paraType = typeFormat[0]
 		paraFormat = typeFormat[1]
+		if para.In == "body" {
+			para.Schema = &swagger.Schema{
+				Type: paraType,
+				Format: paraFormat,
+			}
+		}
 	} else {
 		m, mod, realTypes := getModel(typ)
 		para.Schema = &swagger.Schema{
